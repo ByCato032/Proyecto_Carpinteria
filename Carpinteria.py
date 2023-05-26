@@ -1,5 +1,5 @@
 import simpy
-import random
+import numpy as np
 
 #Variables de la carpintería
 ventas = 0
@@ -9,12 +9,12 @@ compras = 0
 
 #Porcentajes de venta para cada producto
 porcentajes_ventas = {
-    'mesas': random.uniform(0.25, 0.35),
-    'sillas': random.uniform(0.15, 0.25),
-    'roperos': random.uniform(0.1, 0.2),
-    'cabeceras': random.uniform(0.07, 0.17),
-    'mesa_de_noche': random.uniform(0.04, 0.14),
-    'otros': random.uniform(0.15, 0.25)
+   'mesas': np.random.uniform(0.25, 0.35),
+    'sillas': np.random.uniform(0.15, 0.25),
+    'roperos': np.random.uniform(0.1, 0.2),
+    'cabeceras': np.random.uniform(0.07, 0.17),
+    'mesa_de_noche': np.random.uniform(0.04, 0.14),
+    'otros': np.random.uniform(0.15, 0.25)
 }
 
 def porcentaje_ganancia(producto):
@@ -29,7 +29,6 @@ def porcentaje_ganancia(producto):
     }
     return porcentajes_ganancia[producto]
 
-cont = 0
 #Se ingresan los precios para cada producto
 precios_base = {}
 print("\n\033[;34m"+"--- Ingreso de precios para los productos ---"+ "\033[;37m")
@@ -43,7 +42,18 @@ for producto in porcentajes_ventas:
             print("Debes escribir un número...")
             continue
 
+#Cantidad de producto que se tiene en stock en base a los analisis hechos
+cant_prod = {
+    'mesas': 47,
+    'sillas': 43,
+    'roperos': 37,
+    'cabeceras': 25,
+    'mesa_de_noche': 19,
+    'otros': 23
+}
 
+def cantidad_prod(producto):
+    return cant_prod[producto]  #Retorna la cantidad que hay del producto
 
 def producto_precio(producto):
     return precios_base[producto]  #Retorna el precio base de un producto
@@ -59,33 +69,52 @@ def venta(env, producto):
     porcentaje_venta = porcentajes_ventas[producto]
 
     while True:
-        cantidad = random.randint(1, 50)
-        precio_venta = producto_precio(producto) * porcentaje_venta
-        ganancia_venta = precio_venta * porcentaje_ganancia(producto)
+        cantidad = np.random.randint(1, 50)
 
-        ventas += precio_venta
-        ganancia += ganancia_venta
+        if cantidad <= cantidad_prod(producto):
+            precio_venta = producto_precio(producto) * porcentaje_venta
+            ganancia_venta = precio_venta * porcentaje_ganancia(producto)
 
-        # Se actualiza las ventas y ganancias totales para cada producto
-        if producto in ventas_totales:
-            ventas_totales[producto] += precio_venta
-            ganancias_totales[producto] += ganancia_venta
+            ventas += precio_venta
+            ganancia += ganancia_venta
+
+            if producto in ventas_totales:
+                ventas_totales[producto] += precio_venta
+                ganancias_totales[producto] += ganancia_venta
+            else:
+                ventas_totales[producto] = precio_venta
+                ganancias_totales[producto] = ganancia_venta
+
+            print(f"Se vendió {cantidad} {producto} con un porcentaje de venta del %{porcentaje_venta*100:.2f}")
+            print(f"Ganancia por venta de {producto}: ${ganancia_venta:.2f}")
+
+            cant_prod[producto] -= cantidad  # Reducir la cantidad de productos disponibles
         else:
-            ventas_totales[producto] = precio_venta
-            ganancias_totales[producto] = ganancia_venta
+           # Realizar la venta con la cantidad de productos disponibles
+            cantidad_vendida = cantidad_prod(producto)
+            if cantidad_vendida > 0:
+                precio_venta = producto_precio(producto) * porcentaje_venta
+                ganancia_venta = precio_venta * porcentaje_ganancia(producto)
 
-        print(
-            f"Se vendió {cantidad} {producto} con un porcentaje de venta del ${porcentaje_venta*100:.2f}")
-        print(f"Ganancia por venta de {producto}: ${ganancia_venta:.2f}")
-        #print(f"Ventas totales: ${ventas:.2f}")
-        #print(f"Ganancia total: ${ganancia:.2f}")
-        yield env.timeout(5)  #Simular tiempo de venta
+                ventas += precio_venta
+                ganancia += ganancia_venta
 
+                if producto in ventas_totales:
+                    ventas_totales[producto] += precio_venta
+                    ganancias_totales[producto] += ganancia_venta
+                else:
+                    ventas_totales[producto] = precio_venta
+                    ganancias_totales[producto] = ganancia_venta
 
-#Se crea el objeto env para realizar el ambiente de simulacion
+                print(f"No hay suficientes {producto} para vender {cantidad} unidades. Se vendieron {cantidad_vendida} unidades.")
+                print(f"Ganancia por venta de {producto}: ${ganancia_venta:.2f}")
+
+                cant_prod[producto] -= cantidad_vendida  # Reducir la cantidad de productos disponibles
+
+        yield env.timeout(5)
+
 env = simpy.Environment()
 
-#Se crean los procesos de simulacion de venta
 env.process(venta(env, 'mesas'))
 env.process(venta(env, 'sillas'))
 env.process(venta(env, 'roperos'))
@@ -93,9 +122,8 @@ env.process(venta(env, 'cabeceras'))
 env.process(venta(env, 'mesa_de_noche'))
 env.process(venta(env, 'otros'))
 
-env.run(until=10)  #Simular durante el tiempo especificado
+env.run(until=10)
 
-#Se imprimen las ventas y ganacias totales de la carpinteria
 print("\033[;32m"+"\n--- Total de cada producto ---" + "\033[;37m")
 for producto in ventas_totales:
     print(f"Ventas totales de {producto}: ${ventas_totales[producto]:.2f}")
